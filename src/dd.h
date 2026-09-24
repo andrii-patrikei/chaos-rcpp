@@ -7,11 +7,11 @@
 //
 // The type provides exactly the operators the templated RK4 kernel needs, so
 // the same integrator code that runs in float and double also runs here.
-// It is much slower than double (roughly 50-90x in this integrator, because
-// every double-double addition is a chain of about twenty dependent
-// floating-point operations and the code becomes latency bound) but still
-// about 2000x faster than a pure R loop over Rmpfr numbers, which makes it a
-// practical high-precision reference for long runs. The Rmpfr path on the R
+// In this integrator it costs about 5-7x as much as double when compiled with
+// optimisation (the operators must be inlined; at -O0 it is ~25x slower
+// still) and is tens of thousands of times faster than a pure R loop over
+// Rmpfr numbers, which makes it a practical high-precision reference for
+// long runs. The Rmpfr path on the R
 // side remains the gold standard for validating it.
 
 #ifndef CHAOSRCPP_DD_H

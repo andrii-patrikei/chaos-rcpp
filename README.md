@@ -79,19 +79,19 @@ RK4 kernel written once as a C++ template and instantiated three times:
 
 | `precision` | type | unit roundoff | speed (1e6 steps) |
 |---|---|---|---|
-| `"fp32"` | `float` | 6e-8 | about 0.04 to 0.1 s |
-| `"fp64"` | `double` | 1.1e-16 | about 0.04 to 0.1 s |
-| `"dd"` | double-double (`src/dd.h`) | 5e-32 | a few seconds |
+| `"fp32"` | `float` | 6e-8 | about 0.04 s |
+| `"fp64"` | `double` | 1.1e-16 | about 0.05 s |
+| `"dd"` | double-double (`src/dd.h`) | 5e-32 | about 0.25 s |
 | `"mpfr"` | Rmpfr, any number of bits | user chosen | about 110 steps per second |
 
 The double-double type is a header-only implementation of the classical
 error-free transformations (Knuth's TwoSum, Dekker's TwoProd via `fma`),
 following Hida, Li and Bailey (2001). It is verified against Rmpfr to about
-1e-33 relative error. It is far slower than `double` because every
-double-double addition is a chain of about twenty dependent floating-point
-operations, but it is still roughly 2000 times faster than the interpreted
-Rmpfr loop, which makes it the practical default reference for
-`precision_divergence()`. The Rmpfr path (`precision = "mpfr"`) uses the same
+1e-33 relative error. It costs only about five to seven times as much as
+`double` (every double-double operation is a short chain of ordinary
+floating-point operations, all inlined) and is tens of thousands of times
+faster than the interpreted Rmpfr loop, which makes it the practical default
+reference for `precision_divergence()`. The Rmpfr path (`precision = "mpfr"`) uses the same
 RK4 formulas in R and remains the gold standard for validating everything
 else.
 
@@ -174,15 +174,22 @@ are cross-checked in the test suite against a brute-force R implementation.
 `benchmark_lorenz()` times one million Lorenz RK4 steps at `dt = 0.01`
 against `deSolve::rk4()` and a pure R loop, and reports the maximum
 difference in the states as a correctness check. Numbers below are from a
-single shared 2.1 GHz Xeon core; expect two to three times better on a
-desktop.
+single shared 2.1 GHz Xeon core and vary by 20 to 30 percent between runs;
+expect several times better on a desktop. The chaosrcpp times include
+allocating and filling the million-row output matrix.
+
+Benchmark an installed package (`remotes::install_github()` or
+`devtools::install()`), not a `devtools::load_all()` session: `load_all()`
+compiles the C++ without optimisation (`-O0`), which leaves `double` about
+two to three times slower and the double-double kernel about 25 times slower,
+because its small operator functions are no longer inlined.
 
 | method | seconds | steps per second | speedup vs deSolve | max abs diff vs fp64 |
 |---|---|---|---|---|
-| chaosrcpp fp64 | 0.099 | 10,101,010 | 94x | 0 |
-| chaosrcpp fp32 | 0.094 | 10,638,298 | 99x | 3.3e-5 |
-| deSolve rk4 | 9.330 | 107,216 | 1x | 5.7e-14 |
-| pure R loop | 3.550 | 281,770 | 3x | 2.0e-14 |
+| chaosrcpp fp64 | 0.083 | 12,048,193 | 147x | 0 |
+| chaosrcpp fp32 | 0.123 | 8,130,081 | 99x | 3.3e-5 |
+| deSolve rk4 | 12.200 | 82,082 | 1x | 5.7e-14 |
+| pure R loop | 4.860 | 205,634 | 3x | 2.0e-14 |
 
 Two honest notes on this table. First, deSolve is slower than the pure R loop
 here only because the benchmark passes it an R function as the right-hand

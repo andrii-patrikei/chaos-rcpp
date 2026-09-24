@@ -43,14 +43,13 @@ plot(tr, col = hcl.colors(nrow(tr), "Viridis"))
 ```
 
 A million RK4 steps take a few hundredths of a second in `double`. The
-double-double level is far slower (roughly 50 to 90 times, because each
-double-double addition is a long chain of dependent operations) but still
-about 2000 times faster than an interpreted Rmpfr loop, which is what makes it
-usable as a reference for runs of tens of thousands of steps:
+double-double level costs only about five to seven times as much and is tens
+of thousands of times faster than an interpreted Rmpfr loop, which is what
+makes it the default high-precision reference:
 
 ```{r timing}
 system.time(lorenz(n = 1e6, thin = 100))
-system.time(lorenz(n = 2e5, thin = 100, precision = "dd"))
+system.time(lorenz(n = 1e6, thin = 100, precision = "dd"))
 ```
 
 ### The butterfly effect of rounding error
