@@ -1,0 +1,208 @@
+---
+title: "chaosrcpp: chaos, precision and recurrence"
+author: "Andrii Patrikei"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    fig_width: 7
+    fig_height: 5
+vignette: >
+  %\VignetteIndexEntry{chaosrcpp: chaos, precision and recurrence}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", dpi = 96, fig.align = "center")
+has_gg <- requireNamespace("ggplot2", quietly = TRUE) && requireNamespace("patchwork", quietly = TRUE)
+has_mpfr <- requireNamespace("Rmpfr", quietly = TRUE)
+has_plotly <- requireNamespace("plotly", quietly = TRUE)
+has_desolve <- requireNamespace("deSolve", quietly = TRUE)
+library(chaosrcpp)
+```
+
+## What this package is about
+
+Three things that tend to live in separate corners of a curriculum sit
+together here: the numerics of integrating a chaotic ODE, the concept of
+sensitive dependence on initial conditions, and the tools used to quantify
+the resulting time series. The compiled kernels make all of it fast enough to
+play with interactively.
+
+## 1. The Lorenz system in three precisions
+
+The integrator is one C++ template. `precision = "fp32"` instantiates it
+with `float`, `"fp64"` with `double`, and `"dd"` with a double-double type
+that carries about 106 bits. `"mpfr"` runs the same RK4 formulas in the
+arbitrary-precision Rmpfr package as a gold-standard check.
+
+```{r lorenz}
+tr <- lorenz(n = 8000, dt = 0.01)
+tr
+plot(tr, col = hcl.colors(nrow(tr), "Viridis"))
+```
+
+A million RK4 steps take a few hundredths of a second in `double`. The
+double-double level is far slower (roughly 50 to 90 times, because each
+double-double addition is a long chain of dependent operations) but still
+about 2000 times faster than an interpreted Rmpfr loop, which is what makes it
+usable as a reference for runs of tens of thousands of steps:
+
+```{r timing}
+system.time(lorenz(n = 1e6, thin = 100))
+system.time(lorenz(n = 2e5, thin = 100, precision = "dd"))
+```
+
+### The butterfly effect of rounding error
+
+Everyone knows that two nearby initial conditions separate exponentially on
+a chaotic attractor. Rounding error is a perturbation of the same kind: every
+arithmetic operation nudges the state by a relative amount of about
+$\epsilon$, the unit roundoff of the number format. `precision_divergence()`
+runs the *same* initial condition, algorithm and step size at several
+precisions and measures the distance to a high-precision reference.
+
+```{r divergence, fig.height = 6.5, eval = has_gg}
+d <- precision_divergence(t_max = 60)
+d
+plot_divergence(d)
+```
+
+The dashed lines are the back-of-the-envelope prediction
+$\epsilon \, e^{\lambda_1 t}$ with $\lambda_1 \approx 0.906$ the largest
+Lyapunov exponent. Single precision ($\epsilon \approx 6 \cdot 10^{-8}$)
+loses the trajectory around $t \approx 18$, double precision
+($\epsilon \approx 10^{-16}$) around $t \approx 40$. Neither run is "wrong":
+both are legitimate shadows of the true dynamics, but they are not the same
+shadow, and any claim about the state of a chaotic system at a specific time
+has to reckon with this.
+
+If Rmpfr is installed the reference can be the arbitrary-precision run, and
+then the double-double level joins the comparison. That run is an R-level
+loop and takes about a minute for `t_max = 60`, so it is shown in the README
+rather than evaluated here.
+
+```{r mpfr-check, eval = has_mpfr}
+# Short cross-check: dd and mpfr agree to double resolution over 200 steps
+m <- lorenz(n = 200, precision = "mpfr", mpfr_bits = 160)
+dd <- lorenz(n = 200, precision = "dd")
+max(abs(as.matrix(dd[, 2:4]) - as.matrix(m[, 2:4])))
+```
+
+### Interactive 3D view
+
+```{r plotly, eval = has_plotly}
+plot_attractor_3d(fp32 = lorenz(n = 2500, precision = "fp32"),
+                  fp64 = lorenz(n = 2500))
+```
+
+### Lyapunov spectrum
+
+The full spectrum comes from integrating a set of tangent vectors along the
+trajectory and re-orthonormalising them by Gram-Schmidt after every step.
+The exponents must add up to the trace of the Jacobian,
+$-(\sigma + 1 + \beta) = -13.667$, which is a satisfying self-check.
+
+```{r lyapunov}
+lyapunov_spectrum("lorenz", n = 200000)
+lyapunov_spectrum("roessler", dt = 0.02, n = 300000)
+```
+
+## 2. Maps
+
+### Logistic map: bifurcation diagram and Lyapunov exponent
+
+```{r logistic, fig.height = 6.5, eval = has_gg}
+r <- seq(2.8, 4, length.out = 1500)
+bif <- logistic_bifurcation(r)
+ly <- logistic_lyapunov(r)
+plot_bifurcation(bif, ly)
+```
+
+The shaded regions of positive exponent coincide exactly with the chaotic
+bands of the diagram, and every periodic window inside the chaotic region is
+a dip below zero. At $r = 4$ the exponent is $\log 2$:
+
+```{r log2}
+logistic_lyapunov(4, n = 1e5)$lambda - log(2)
+```
+
+```{r cobweb, fig.height = 5, fig.width = 5, eval = has_gg}
+plot_cobweb(logistic_cobweb(3.9, x0 = 0.1, n = 80))
+```
+
+### Henon, Ikeda and the standard map
+
+```{r henon-ikeda, fig.height = 4, fig.width = 8}
+layout(matrix(1:2, 1))
+plot(henon(n = 60000))
+plot(ikeda(n = 80000), col = "#7b1e3a")
+```
+
+```{r standard-map, fig.height = 6.5, fig.width = 6.5}
+plot(standard_map(K = 0.9, n_orbits = 60, n = 600))
+```
+
+## 3. Recurrence plots and RQA
+
+A recurrence plot marks the pairs of times $(i, j)$ at which the state
+returns to within $\epsilon$ of itself. Its line structures carry a
+surprising amount of information about the dynamics, and Recurrence
+Quantification Analysis turns them into a handful of numbers: the recurrence
+rate (RR), the fraction of points on diagonal lines (determinism, DET), the
+average and longest diagonal line (L, Lmax), the entropy of the line length
+distribution (ENTR), and the vertical-line analogues laminarity (LAM) and
+trapping time (TT).
+
+```{r rp, fig.height = 4.2, fig.width = 8.4}
+tr <- lorenz(n = 3000, dt = 0.02)
+layout(matrix(1:2, 1))
+plot(tr)
+plot_recurrence(tr, rr = 0.05)
+```
+
+```{r rqa}
+rqa(tr, rr = 0.05)
+```
+
+The same measures separate a periodic signal from noise at a glance:
+
+```{r rqa-compare}
+set.seed(1)
+periodic <- sin(seq(0, 30 * pi, length.out = 1500))
+noise <- rnorm(1500)
+rbind(periodic = rqa_features(periodic, m = 3, tau = 10),
+      noise    = rqa_features(noise, m = 3, tau = 1))
+```
+
+`rqa_features()` returns one row per signal, which is the shape you want
+when RQA measures are fed into a classifier or a clustering method as
+features. The delay embedding for scalar series is done with `embed_delay()`
+(or the `m` and `tau` arguments); multivariate input such as a
+`chaos_trajectory` is used as-is.
+
+Definitions follow Marwan, Romano, Thiel and Kurths (2007), *Recurrence plots
+for the analysis of complex systems*, Physics Reports 438, 237-329. The
+diagonal and vertical line histograms are returned too (`$diag_hist`,
+`$vert_hist`) for anyone who wants to build other measures on top.
+
+## 4. Benchmark
+
+```{r bench, eval = has_desolve}
+benchmark_lorenz(n = 100000)
+```
+
+All four implementations run the identical scheme, so they agree to rounding
+over the comparison window. The speed difference is the whole reason the
+compiled kernel exists: it turns "run the divergence experiment once" into
+"sweep it over a grid of parameters".
+
+## 5. Interactive explorer
+
+```{r shiny, eval = FALSE}
+run_chaos_explorer()
+```
+
+The Shiny app exposes the Lorenz parameters, the fp32-versus-fp64 comparison,
+the logistic map with a movable `r` and the standard map with adjustable kick
+strength.

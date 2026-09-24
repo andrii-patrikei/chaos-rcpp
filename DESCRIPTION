@@ -1,0 +1,46 @@
+Package: chaosrcpp
+Type: Package
+Title: Chaotic Dynamical Systems in Rcpp with Precision Control and Recurrence Quantification Analysis
+Version: 0.1.0
+Authors@R: person("Andrii", "Patrikei", email = "andriipatrikei@gmail.com",
+    role = c("aut", "cre"), comment = c(ORCID = "0000-0003-2015-4843"))
+Description: Fast compiled integrators and iterators for classic chaotic
+    systems. The Lorenz and Roessler flows are integrated with a
+    fourth-order Runge-Kutta kernel templated on the floating-point type, so
+    the same code runs in single precision, double precision and a
+    double-double type of about 106 bits, with an arbitrary-precision 'Rmpfr'
+    run as the gold-standard reference. This makes it possible to watch
+    rounding error alone drive two identical initial conditions apart on a
+    chaotic attractor. Also included are Lyapunov spectra by Gram-Schmidt
+    reorthonormalisation, the logistic, Henon, Ikeda and Chirikov standard
+    maps with bifurcation diagrams and Lyapunov exponents, recurrence plots
+    and Recurrence Quantification Analysis measures (RR, DET, L, Lmax, ENTR,
+    LAM, TT and more), plotting helpers including an interactive 3D view, a
+    benchmark against 'deSolve' and a 'shiny' explorer.
+License: MIT + file LICENSE
+URL: https://github.com/andrii-patrikei/chaos-rcpp
+BugReports: https://github.com/andrii-patrikei/chaos-rcpp/issues
+Encoding: UTF-8
+Depends: R (>= 4.1)
+Imports:
+    Rcpp (>= 1.0.0),
+    stats,
+    graphics,
+    grDevices,
+    utils,
+    tools
+LinkingTo: Rcpp
+Suggests:
+    Rmpfr,
+    deSolve,
+    ggplot2,
+    patchwork,
+    plotly,
+    shiny,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
