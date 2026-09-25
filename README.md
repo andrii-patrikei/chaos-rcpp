@@ -26,7 +26,7 @@ at `t = 60`.
 
 ```r
 # install.packages("remotes")
-remotes::install_github("andrii-patrikei/chaos-rcpp")
+remotes::install_github("andrii-patrikei/chaos-rcpp", build_vignettes = TRUE)
 ```
 
 A C++11 compiler is required (Rtools on Windows, Xcode command line tools on
@@ -157,6 +157,36 @@ classification in Patrikei et al. (2026), *Acta Gymnica* 56, e2026.004
 standalone implementation of that step. The C++ results
 are cross-checked in the test suite against a brute-force R implementation.
 
+### Dynamic Mode Decomposition and HAVOK
+
+![Koopman view of chaos](man/figures/dmd-koopman.png)
+
+`dmd()` fits the best linear map between consecutive snapshots and returns
+its eigenvalues (growth rates and frequencies) and modes. With `delays > 1`
+the snapshots are delay vectors (Hankel DMD), the practical route to a
+Koopman-operator description of a chaotic system from one or a few measured
+variables. It accepts the same inputs as `rqa()`: a vector, a state matrix,
+a `chaos_trajectory` (the time step is taken from it) or a `chaos_map`.
+`fitted()` and `predict()` reconstruct and forecast, `plot()` draws the
+spectrum.
+
+`dmd_features()` is the counterpart of `rqa_features()`: nine scalars per
+signal or window (dominant frequency and growth rate, spectral radius,
+fraction of eigenvalues on the unit circle, energy share and spectral entropy
+of the modes, and the one-step residual of the linear model). Over the
+logistic map the residual tracks the Lyapunov exponent (Spearman 0.96),
+including the period-3 window (middle panel).
+
+`havok()` implements the Hankel Alternative View Of Koopman of Brunton et al.
+(2017): a linear model of the leading delay coordinates driven by the last one
+as a forcing. On Lorenz the linear part comes out almost exactly
+skew-symmetric and the forcing bursts in the saddle region where the
+trajectory switches lobe (right panel): about nine in ten bursts sit at a
+switch, though only a third to two fifths of switches produce one. A linear surrogate cannot forecast
+chaos far: DMD forecasts of Lorenz hold for a few tenths of a time unit,
+under one Lyapunov time. The package treats DMD as a diagnostic and a
+feature extractor. See `vignette("dmd", package = "chaosrcpp")`.
+
 ### Plots and interactivity
 
 * `plot()` on any trajectory or map (base graphics), `plot_attractor()` with
@@ -251,6 +281,14 @@ reference run.
   Symposium on Computer Arithmetic*, 155-162.
 * Marwan, N., Romano, M. C., Thiel, M., & Kurths, J. (2007). Recurrence plots
   for the analysis of complex systems. *Physics Reports*, 438(5-6), 237-329.
+* Schmid, P. J. (2010). Dynamic mode decomposition of numerical and
+  experimental data. *Journal of Fluid Mechanics*, 656, 5-28.
+* Tu, J. H., Rowley, C. W., Luchtenburg, D. M., Brunton, S. L., & Kutz, J. N.
+  (2014). On dynamic mode decomposition: theory and applications. *Journal of
+  Computational Dynamics*, 1(2), 391-421.
+* Brunton, S. L., Brunton, B. W., Proctor, J. L., Kaiser, E., & Kutz, J. N.
+  (2017). Chaos as an intermittently forced linear system. *Nature
+  Communications*, 8, 19.
 * Patrikei, A., Cuberek, R., Halfar, R., & Martinovič, T. (2026). Essential
   time series characteristics for human motion analysis based on
   Self-Organizing Map clustering. *Acta Gymnica*, 56, e2026.004.
