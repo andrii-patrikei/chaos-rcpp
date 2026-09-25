@@ -11,7 +11,8 @@ floating-point precision switch (fp32, fp64, double-double and an
 arbitrary-precision Rmpfr reference) for demonstrating sensitive dependence
 on rounding error,
 Lyapunov exponents, recurrence plots and Recurrence Quantification Analysis
-(RQA) measures, plotting helpers and a small Shiny explorer.
+(RQA) measures, Dynamic Mode Decomposition (plain, delay-coordinate and
+HAVOK), plotting helpers and a small Shiny explorer.
 }
 \details{
 Main entry points:
@@ -22,6 +23,8 @@ Main entry points:
 \code{\link[=logistic_cobweb]{logistic_cobweb()}}, \code{\link[=henon]{henon()}}, \code{\link[=ikeda]{ikeda()}}, \code{\link[=standard_map]{standard_map()}}
 \item RQA: \code{\link[=embed_delay]{embed_delay()}}, \code{\link[=recurrence_matrix]{recurrence_matrix()}}, \code{\link[=rqa]{rqa()}},
 \code{\link[=rqa_features]{rqa_features()}}
+\item Koopman / DMD: \code{\link[=dmd]{dmd()}}, \code{\link[=dmd_features]{dmd_features()}}, \code{\link[=predict.dmd]{predict.dmd()}},
+\code{\link[=havok]{havok()}}
 \item Plots: \code{\link[=plot_divergence]{plot_divergence()}}, \code{\link[=plot_bifurcation]{plot_bifurcation()}},
 \code{\link[=plot_recurrence]{plot_recurrence()}}, \code{\link[=plot_attractor]{plot_attractor()}}, \code{\link[=plot_attractor_3d]{plot_attractor_3d()}}
 \item Benchmark: \code{\link[=benchmark_lorenz]{benchmark_lorenz()}}

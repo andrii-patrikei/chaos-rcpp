@@ -1,7 +1,7 @@
 Package: chaosrcpp
 Type: Package
 Title: Chaotic Dynamical Systems in Rcpp with Precision Control and Recurrence Quantification Analysis
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: person("Andrii", "Patrikei", email = "andriipatrikei@gmail.com",
     role = c("aut", "cre"), comment = c(ORCID = "0000-0003-2015-4843"))
 Description: Fast compiled integrators and iterators for classic chaotic
@@ -15,7 +15,9 @@ Description: Fast compiled integrators and iterators for classic chaotic
     reorthonormalisation, the logistic, Henon, Ikeda and Chirikov standard
     maps with bifurcation diagrams and Lyapunov exponents, recurrence plots
     and Recurrence Quantification Analysis measures (RR, DET, L, Lmax, ENTR,
-    LAM, TT and more), plotting helpers including an interactive 3D view, a
+    LAM, TT and more), Dynamic Mode Decomposition with delay coordinates
+    (Hankel DMD) and the HAVOK intermittently-forced linear model, a
+    one-row feature summary for RQA and DMD, plotting helpers including an interactive 3D view, a
     benchmark against 'deSolve' and a 'shiny' explorer.
 License: MIT + file LICENSE
 URL: https://github.com/andrii-patrikei/chaos-rcpp

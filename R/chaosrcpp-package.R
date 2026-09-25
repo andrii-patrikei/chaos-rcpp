@@ -5,7 +5,8 @@
 #' arbitrary-precision Rmpfr reference) for demonstrating sensitive dependence
 #' on rounding error,
 #' Lyapunov exponents, recurrence plots and Recurrence Quantification Analysis
-#' (RQA) measures, plotting helpers and a small Shiny explorer.
+#' (RQA) measures, Dynamic Mode Decomposition (plain, delay-coordinate and
+#' HAVOK), plotting helpers and a small Shiny explorer.
 #'
 #' Main entry points:
 #' \itemize{
@@ -15,6 +16,8 @@
 #'     [logistic_cobweb()], [henon()], [ikeda()], [standard_map()]
 #'   \item RQA: [embed_delay()], [recurrence_matrix()], [rqa()],
 #'     [rqa_features()]
+#'   \item Koopman / DMD: [dmd()], [dmd_features()], [predict.dmd()],
+#'     [havok()]
 #'   \item Plots: [plot_divergence()], [plot_bifurcation()],
 #'     [plot_recurrence()], [plot_attractor()], [plot_attractor_3d()]
 #'   \item Benchmark: [benchmark_lorenz()]
@@ -27,7 +30,8 @@
 #' @useDynLib chaosrcpp, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
 #' @importFrom stats quantile sd
-#' @importFrom graphics plot points lines abline image par layout legend axis box
+#' @importFrom graphics plot points lines abline image par layout legend axis box mtext
+#' @importFrom stats fitted predict
 #' @importFrom grDevices hcl.colors rgb adjustcolor
 "_PACKAGE"
 

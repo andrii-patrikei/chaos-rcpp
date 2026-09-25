@@ -1,0 +1,161 @@
+---
+title: "Linear lenses on chaos: DMD, Hankel DMD and HAVOK"
+author: "Andrii Patrikei"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    fig_width: 7
+    fig_height: 4.5
+vignette: >
+  %\VignetteIndexEntry{Linear lenses on chaos: DMD, Hankel DMD and HAVOK}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", dpi = 96, fig.align = "center")
+library(chaosrcpp)
+```
+
+## The idea in one paragraph
+
+Dynamic Mode Decomposition fits the best linear map $z_{k+1} \approx A z_k$
+to a sequence of snapshots and reads off the eigenvalues and eigenvectors
+of $A$. Every mode evolves as $\lambda^k$, so each one has a frequency and a
+growth or decay rate. Koopman's theorem says any nonlinear system is linear
+when viewed through the right (infinitely many) observables; stacking delayed
+copies of the measurements is a practical way to supply many observables,
+which is why the delay-embedding machinery already in this package
+([embed_delay()]) is the natural front end for DMD.
+
+## Regular dynamics: exact recovery
+
+```{r}
+dt <- 0.05
+t <- seq(0, 20, by = dt)
+x <- exp(-0.1 * t) * sin(2 * pi * 0.5 * t) + 0.5 * sin(2 * pi * 1.3 * t)
+d <- dmd(x, rank = 4, delays = 20, dt = dt)
+d
+```
+
+Two frequencies, one damped at rate 0.1 and one neutral, recovered to machine
+precision from a single scalar series.
+
+## A chaotic flow
+
+Three Lorenz variables alone give at most three modes. With 60 delays the
+linear model has room to describe the attractor:
+
+```{r, fig.height = 4}
+tr <- lorenz(n = 8000, dt = 0.01)
+dl <- dmd(tr, delays = 60, rank = 40)
+dl
+plot(dl)
+```
+
+Many modes, most close to the unit circle: the finite-dimensional shadow of
+the continuous Koopman spectrum of a chaotic flow. The model is still linear,
+so it cannot forecast far:
+
+```{r}
+train <- tr[tr$t >= 5 & tr$t <= 60, ]
+class(train) <- c("chaos_trajectory", "data.frame"); attr(train, "dt") <- 0.01
+fc <- predict(dmd(train, delays = 200, rank = 150), n_ahead = 300)
+truth <- tr[tr$t > 60, ][1:300, ]
+err <- sqrt(rowSums((as.matrix(fc[, 2:4]) - as.matrix(truth[, 2:4]))^2))
+fc$t[which(err > 0.3 * sqrt(3) * sd(train$x))[1]] - 60   # time until 30% error
+```
+
+A few tenths of a time unit, well under one Lyapunov time
+($1/\lambda_1 \approx 1.1$). The precision experiment in the main vignette
+shows fp32 losing the trajectory at $t \approx 18$; a linear surrogate loses it
+almost immediately. DMD is a diagnostic lens here, not a forecaster.
+
+## DMD as a feature extractor
+
+[dmd_features()] mirrors [rqa_features()]: one row of scalars per signal.
+Across the logistic map, the one-step residual of the linear model follows
+the Lyapunov exponent closely, including the period-3 window:
+
+```{r}
+rs <- seq(3.4, 4, length.out = 121)
+ly <- logistic_lyapunov(rs)$lambda
+f <- do.call(rbind, lapply(rs, function(r) {
+  xr <- logistic_orbit(r, x0 = 0.2, n = 1500)[-(1:500)]
+  dmd_features(xr, delays = 16, center = TRUE)
+}))
+cor(ly, f$dmd_one_step_nrmse, method = "spearman")
+op <- par(mar = c(4, 4, 1, 4))
+plot(rs, ly, type = "l", xlab = "r", ylab = "Lyapunov exponent")
+abline(h = 0, col = "grey70")
+par(new = TRUE)
+plot(rs, f$dmd_one_step_nrmse, type = "l", col = "#c0392b", axes = FALSE, xlab = "", ylab = "")
+axis(4, col.axis = "#c0392b"); mtext("DMD one-step error", 4, line = 2.5, col = "#c0392b")
+par(op)
+```
+
+In a sensor pipeline, `rbind(rqa_features(w), dmd_features(w))` per window
+gives a nonlinear (recurrence) and a linear-spectral (Koopman) view of the
+same signal side by side.
+
+## HAVOK: chaos as a forced linear system
+
+Brunton et al. (2017) regress the time derivative of the leading
+eigen-time-delay coordinates on themselves, keeping the last coordinate as an
+external forcing:
+
+```{r, fig.height = 5}
+x0 <- unlist(tail(lorenz(n = 5000, dt = 0.002), 1)[c("x", "y", "z")])  # start on the attractor
+tr2 <- lorenz(x0 = x0, n = 60000, dt = 0.002)
+h <- havok(tr2, delays = 50, rank = 11)
+h
+plot(h)
+```
+
+The linear part is almost exactly skew-symmetric, a chain of coupled
+oscillators, and the forcing is mostly quiet with bursts around the saddle
+region where the trajectory switches lobe. The relationship is one-sided:
+
+```{r}
+act <- abs(h$forcing) > 2 * sd(h$forcing)
+r <- rle(act); ends <- cumsum(r$lengths); mid <- (ends - r$lengths / 2)[r$values]
+sw <- which(diff(sign(h$x)) != 0)
+w <- round(0.3 / h$dt)
+c(bursts_near_a_switch = mean(sapply(mid, function(m) any(abs(sw - m) <= w))),
+  switches_with_a_burst = mean(sapply(sw, function(s) any(abs(mid - s) <= w))))
+```
+
+Almost every burst sits at a switch, but most switches pass without one at
+this threshold. A burst is a reliable warning; its absence is not an
+all-clear.
+
+## Where quantum computing would enter
+
+The expensive step in all three methods is the singular value decomposition
+of the snapshot matrix. For the systems in this package it is cheap: a few
+hundred delay coordinates by a few thousand snapshots. Quantum DMD proposals
+target the other end, fields with $2^{q}$ state dimensions (fluid or grid
+simulations), where the SVD and eigendecomposition would be done with
+quantum linear-algebra routines. The classical, exact implementation here is
+the reference such work needs to compare against, in the same spirit as the
+Rmpfr reference for the precision experiments.
+
+## References
+
+Schmid, P. J. (2010). Dynamic mode decomposition of numerical and experimental
+data. *Journal of Fluid Mechanics*, 656, 5-28.
+
+Tu, J. H., Rowley, C. W., Luchtenburg, D. M., Brunton, S. L., & Kutz, J. N.
+(2014). On dynamic mode decomposition: theory and applications. *Journal of
+Computational Dynamics*, 1(2), 391-421.
+
+Arbabi, H., & Mezic, I. (2017). Ergodic theory, dynamic mode decomposition, and
+computation of spectral properties of the Koopman operator. *SIAM Journal on
+Applied Dynamical Systems*, 16(4), 2096-2126.
+
+Brunton, S. L., Brunton, B. W., Proctor, J. L., Kaiser, E., & Kutz, J. N.
+(2017). Chaos as an intermittently forced linear system. *Nature
+Communications*, 8, 19.
+
+Kutz, J. N., Brunton, S. L., Brunton, B. W., & Proctor, J. L. (2016).
+*Dynamic Mode Decomposition: Data-Driven Modeling of Complex Systems*. SIAM.
